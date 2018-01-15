@@ -32,11 +32,18 @@ import org.wso2.carbon.device.mgt.jaxrs.util.DeviceMgtAPIUtils;
 import org.wso2.carbon.user.api.UserStoreException;
 
 import javax.validation.constraints.Size;
-import javax.ws.rs.*;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.GET;
+import javax.ws.rs.HeaderParam;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
@@ -50,8 +57,7 @@ public class ActivityProviderServiceImpl implements ActivityInfoProviderService 
     @GET
     @Override
     @Path("/{id}")
-    public Response getActivity(@PathParam("id")
-                                @Size(max = 45) String id,
+    public Response getActivity(@PathParam("id") @Size(max = 45) String id,
                                 @HeaderParam("If-Modified-Since") String ifModifiedSince) {
         Activity activity;
         DeviceManagementProviderService dmService;
@@ -79,16 +85,62 @@ public class ActivityProviderServiceImpl implements ActivityInfoProviderService 
         }
     }
 
+    @GET
+    @Override
+    @Path("/ids")
+    public Response getActivities(@QueryParam("ids") String ids) {
+
+        List<String> idList;
+        String[] splits = ids.split(",");
+        if (splits.length > 1 && splits[0] != null && !splits[0].isEmpty()) {
+            idList = Arrays.asList(splits);
+        } else {
+            String msg = "Activity Ids shouldn't be empty";
+            log.error(msg);
+            return Response.status(400).entity(
+                    new ErrorResponse.ErrorResponseBuilder().setMessage(msg).build()).build();
+        }
+
+        Response validationFailedResponse = validateAdminUser();
+        if (validationFailedResponse == null) {
+            List<Activity> activities;
+            ActivityList activityList = new ActivityList();
+            DeviceManagementProviderService dmService;
+            try {
+                idList.forEach(RequestValidationUtil::validateActivityId);
+                dmService = DeviceMgtAPIUtils.getDeviceManagementService();
+                activities = dmService.getOperationByActivityIds(idList);
+                if(!activities.isEmpty()){
+                    activityList.setList(activities);
+                    int count = activities.size();
+                    if (log.isDebugEnabled()) {
+                        log.debug("Activity count: " + count);
+                    }
+                    activityList.setCount(count);
+                    return Response.ok().entity(activityList).build();
+                } else {
+                    String msg = "No activity found with the given IDs.";
+                    log.error(msg);
+                    return Response.status(404).entity(
+                            new ErrorResponse.ErrorResponseBuilder().setMessage(msg).build()).build();
+                }
+            } catch (OperationManagementException e) {
+                String msg = "ErrorResponse occurred while fetching the activity list for the supplied ids.";
+                log.error(msg, e);
+                return Response.serverError().entity(
+                        new ErrorResponse.ErrorResponseBuilder().setMessage(msg).build()).build();
+            }
+        } else {
+            return validationFailedResponse;
+        }
+    }
 
     @GET
     @Override
     @Path("/{id}/{devicetype}/{deviceid}")
-    public Response getActivityByDevice(@PathParam("id")
-                                        @Size(max = 45) String id,
-                                        @PathParam("devicetype")
-                                        @Size(max = 45) String devicetype,
-                                        @PathParam("deviceid")
-                                        @Size(max = 45) String deviceid,
+    public Response getActivityByDevice(@PathParam("id") @Size(max = 45) String id,
+                                        @PathParam("devicetype") @Size(max = 45) String devicetype,
+                                        @PathParam("deviceid") @Size(max = 45) String deviceid,
                                         @HeaderParam("If-Modified-Since") String ifModifiedSince) {
         Activity activity;
         DeviceManagementProviderService dmService;
@@ -119,19 +171,20 @@ public class ActivityProviderServiceImpl implements ActivityInfoProviderService 
     @Override
     @Path("/type/{operationCode}")
     public Response getActivities(@PathParam("operationCode") String operationCode,
-                                  @QueryParam("offset") int offset, @QueryParam("limit") int limit){
+                                  @QueryParam("offset") int offset, @QueryParam("limit") int limit) {
         if (log.isDebugEnabled()) {
-            log.debug("getActivities -> Operation Code : " +operationCode+ "offset " + offset + " limit: " + limit );
+            log.debug("getActivities -> Operation Code : " + operationCode + "offset " + offset + " limit: "
+                    + limit);
         }
         RequestValidationUtil.validatePaginationParameters(offset, limit);
         Response response = validateAdminUser();
-        if(response == null){
+        if (response == null) {
             List<Activity> activities;
             ActivityList activityList = new ActivityList();
             DeviceManagementProviderService dmService;
             try {
                 if (log.isDebugEnabled()) {
-                    log.debug("Calling database to get activities for the operation code :" +operationCode);
+                    log.debug("Calling database to get activities for the operation code :" + operationCode);
                 }
                 dmService = DeviceMgtAPIUtils.getDeviceManagementService();
                 activities = dmService.getFilteredActivities(operationCode, limit, offset);
@@ -157,7 +210,6 @@ public class ActivityProviderServiceImpl implements ActivityInfoProviderService 
         }
     }
 
-
     @GET
     @Override
     public Response getActivities(@QueryParam("since") String since, @QueryParam("offset") int offset,
@@ -179,9 +231,9 @@ public class ActivityProviderServiceImpl implements ActivityInfoProviderService 
             try {
                 ifSinceDate = format.parse(ifModifiedSince);
             } catch (ParseException e) {
-                return Response.status(400).entity(
-                        new ErrorResponse.ErrorResponseBuilder().setMessage(
-                                "Invalid date string is provided in 'If-Modified-Since' header").build()).build();
+                return Response.status(400).entity(new ErrorResponse.ErrorResponseBuilder()
+                        .setMessage("Invalid date string is provided in 'If-Modified-Since' header").build())
+                        .build();
             }
             ifModifiedSinceTimestamp = ifSinceDate.getTime();
             isIfModifiedSinceSet = true;
@@ -192,9 +244,8 @@ public class ActivityProviderServiceImpl implements ActivityInfoProviderService 
             try {
                 sinceDate = format.parse(since);
             } catch (ParseException e) {
-                return Response.status(400).entity(
-                        new ErrorResponse.ErrorResponseBuilder().setMessage(
-                                "Invalid date string is provided in 'since' filter").build()).build();
+                return Response.status(400).entity(new ErrorResponse.ErrorResponseBuilder()
+                        .setMessage("Invalid date string is provided in 'since' filter").build()).build();
             }
             sinceTimestamp = sinceDate.getTime();
             timestamp = sinceTimestamp / 1000;
@@ -246,16 +297,15 @@ public class ActivityProviderServiceImpl implements ActivityInfoProviderService 
         }
     }
 
-    private Response validateAdminUser(){
+    private Response validateAdminUser() {
         try {
             if (!DeviceMgtAPIUtils.isAdmin()) {
-                return Response.status(Response.Status.UNAUTHORIZED).entity("Unauthorized operation! Only admin role can perform " +
-                        "this operation.").build();
+                return Response.status(Response.Status.UNAUTHORIZED).entity(
+                        "Unauthorized operation! Only admin role can perform " + "this operation.").build();
             }
             return null;
         } catch (UserStoreException e) {
-            String msg
-                    = "Error occurred while validating the user have admin role!";
+            String msg = "Error occurred while validating the user have admin role!";
             log.error(msg, e);
             return Response.serverError().entity(
                     new ErrorResponse.ErrorResponseBuilder().setMessage(msg).build()).build();
