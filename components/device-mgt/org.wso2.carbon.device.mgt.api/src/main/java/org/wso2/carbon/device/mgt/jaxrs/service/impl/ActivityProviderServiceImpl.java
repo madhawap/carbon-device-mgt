@@ -219,6 +219,10 @@ public class ActivityProviderServiceImpl implements ActivityInfoProviderService 
         long sinceTimestamp;
         long timestamp = 0;
         boolean isIfModifiedSinceSet = false;
+        if (log.isDebugEnabled()) {
+            log.debug("getActivities since: " + since + " , offset: " + offset + " ,limit: " + limit + " ," +
+                    "ifModifiedSince: " + ifModifiedSince);
+        }
         RequestValidationUtil.validatePaginationParameters(offset, limit);
         if (ifModifiedSince != null && !ifModifiedSince.isEmpty()) {
             Date ifSinceDate;
@@ -246,21 +250,38 @@ public class ActivityProviderServiceImpl implements ActivityInfoProviderService 
             timestamp = sinceTimestamp / 1000;
         }
 
-        timestamp = validatedTimeStamp(timestamp);
-
+        if (timestamp == 0) {
+            //If timestamp is not sent by the user, a default value is set, that is equal to current time-12 hours.
+            long time = System.currentTimeMillis() / 1000;
+            timestamp = time - 42300;
+        }
+        if (log.isDebugEnabled()) {
+            log.debug("getActivities final timestamp " + timestamp);
+        }
         Response response = validateAdminUser();
         if (response == null) {
             List<Activity> activities;
             ActivityList activityList = new ActivityList();
             DeviceManagementProviderService dmService;
             try {
+                if (log.isDebugEnabled()) {
+                    log.debug("Calling database to get activities.");
+                }
                 dmService = DeviceMgtAPIUtils.getDeviceManagementService();
                 activities = dmService.getActivitiesUpdatedAfter(timestamp, limit, offset);
                 activityList.setList(activities);
+                if (log.isDebugEnabled()) {
+                    log.debug("Calling database to get activity count.");
+                }
                 int count = dmService.getActivityCountUpdatedAfter(timestamp);
+                if (log.isDebugEnabled()) {
+                    log.debug("Activity count: " + count);
+                }
                 activityList.setCount(count);
-                if (activities == null && isIfModifiedSinceSet) {
+                if (activities == null || activities.size() == 0) {
+                    if (isIfModifiedSinceSet) {
                         return Response.notModified().build();
+                    }
                 }
                 return Response.ok().entity(activityList).build();
             } catch (OperationManagementException e) {
@@ -275,24 +296,16 @@ public class ActivityProviderServiceImpl implements ActivityInfoProviderService 
         }
     }
 
-    private long validatedTimeStamp(Long timestamp){
-        if (timestamp == 0) {
-            //If timestamp is not sent by the user, a default value is set, that is equal to current time-12 hours.
-            long time = System.currentTimeMillis() / 1000;
-            timestamp = time - 42300;
-        }
-        return timestamp;
-    }
-
-    private Response validateAdminUser() {
+    private Response validateAdminUser(){
         try {
             if (!DeviceMgtAPIUtils.isAdmin()) {
-                return Response.status(Response.Status.UNAUTHORIZED).entity(
-                        "Unauthorized operation! Only admin role can perform this operation.").build();
+                return Response.status(Response.Status.UNAUTHORIZED).entity("Unauthorized operation! Only admin role can perform " +
+                        "this operation.").build();
             }
             return null;
         } catch (UserStoreException e) {
-            String msg = "Error occurred while validating the user have admin role!";
+            String msg
+                    = "Error occurred while validating the user have admin role!";
             log.error(msg, e);
             return Response.serverError().entity(
                     new ErrorResponse.ErrorResponseBuilder().setMessage(msg).build()).build();

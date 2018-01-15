@@ -90,7 +90,8 @@ public class ActivityProviderServiceImplTest {
         activity2.setActivityId("ACTIVITY_2");
         activities.add(activity1);
         activities.add(activity2);
-        activityList.setIds(TEST_ACTIVITY_ID_LIST);
+        activities.add(activity1);
+        activities.add(activity2);
     }
 
     @Test(description =
