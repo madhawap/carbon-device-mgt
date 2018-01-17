@@ -53,8 +53,8 @@ public class ActivityProviderServiceImplTest {
     private static final String TEST_ACTIVITY_ID_LIST = "ACTIVITY_1,ACTIVITY_2";
     private static final List<String> idList = new ArrayList();
     private static final List<Activity> activities = new ArrayList<>();
-    private static final ActivityIdList activityList = new ActivityIdList();
-    private static final ActivityIdList activityListEmpty = new ActivityIdList();
+    private static final ActivityIdList activityList = new ActivityIdList(TEST_ACTIVITY_ID_LIST);
+    private static final ActivityIdList activityListEmpty = new ActivityIdList("");
 
     private List<String> idList1;
     private Activity activity;
@@ -88,8 +88,6 @@ public class ActivityProviderServiceImplTest {
         Activity activity2 = new Activity();
         activity1.setActivityId("ACTIVITY_1");
         activity2.setActivityId("ACTIVITY_2");
-        activities.add(activity1);
-        activities.add(activity2);
         activities.add(activity1);
         activities.add(activity2);
     }
