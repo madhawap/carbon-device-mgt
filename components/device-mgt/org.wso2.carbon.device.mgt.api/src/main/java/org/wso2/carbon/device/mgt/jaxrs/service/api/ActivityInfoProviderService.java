@@ -34,6 +34,7 @@ import org.wso2.carbon.apimgt.annotations.api.Scopes;
 import org.wso2.carbon.device.mgt.common.operation.mgt.Activity;
 import org.wso2.carbon.device.mgt.jaxrs.beans.ActivityList;
 import org.wso2.carbon.device.mgt.jaxrs.beans.ErrorResponse;
+import org.wso2.carbon.device.mgt.jaxrs.common.ActivityIdList;
 import org.wso2.carbon.device.mgt.jaxrs.util.Constants;
 
 import javax.validation.constraints.Size;
@@ -190,21 +191,23 @@ public interface ActivityInfoProviderService {
                     }),
             @ApiResponse(
                     code = 400,
-                    message = "Bad Request. \n Invalid request or validation error.",
+                    message = "Bad Request. \n Activity Ids shouldn't be empty",
                     response = ErrorResponse.class),
             @ApiResponse(
                     code = 401,
-                    message = "Unauthorized. \n Unauthorized request."),
+                    message = "Unauthorized. \n Unauthorized operation! Only admin role can perform this "
+                            + "operation."),
             @ApiResponse(
                     code = 404,
-                    message = "Not Found. \n No activity found with the given ID.",
+                    message = "Not Found. \n No activity found with the given IDs.",
                     response = ErrorResponse.class),
             @ApiResponse(
                     code = 406,
                     message = "Not Acceptable.\n The requested media type is not supported"),
             @ApiResponse(
                     code = 500,
-                    message = "Internal Server Error. \n Server error occurred while fetching the activity data.",
+                    message = "Internal Server Error. \n ErrorResponse occurred while fetching the activity "
+                            + "list for the supplied ids.",
                     response = ErrorResponse.class)
     })
     Response getActivities(
@@ -212,9 +215,9 @@ public interface ActivityInfoProviderService {
                     name = "ids",
                     value = "Comma separated activity/operation ids",
                     required = true,
-                    defaultValue = "ACTIVITY_1")
+                    defaultValue = "ACTIVITY_0")
             @QueryParam("ids")
-                    String ids);
+                    ActivityIdList activityIdList);
 
 
     @GET

@@ -26,6 +26,7 @@ import org.wso2.carbon.device.mgt.common.operation.mgt.OperationManagementExcept
 import org.wso2.carbon.device.mgt.core.service.DeviceManagementProviderService;
 import org.wso2.carbon.device.mgt.jaxrs.beans.ActivityList;
 import org.wso2.carbon.device.mgt.jaxrs.beans.ErrorResponse;
+import org.wso2.carbon.device.mgt.jaxrs.common.ActivityIdList;
 import org.wso2.carbon.device.mgt.jaxrs.service.api.ActivityInfoProviderService;
 import org.wso2.carbon.device.mgt.jaxrs.service.impl.util.RequestValidationUtil;
 import org.wso2.carbon.device.mgt.jaxrs.util.DeviceMgtAPIUtils;
@@ -43,7 +44,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
@@ -88,13 +88,12 @@ public class ActivityProviderServiceImpl implements ActivityInfoProviderService 
     @GET
     @Override
     @Path("/ids")
-    public Response getActivities(@QueryParam("ids") String ids) {
+    public Response getActivities(@QueryParam("ids") ActivityIdList activityIdList) {
 
         List<String> idList;
-        String[] splits = ids.split(",");
-        if (splits.length > 1 && splits[0] != null && !splits[0].isEmpty()) {
-            idList = Arrays.asList(splits);
-        } else {
+        idList = activityIdList.getIdList();
+
+        if (idList == null || idList.isEmpty()) {
             String msg = "Activity Ids shouldn't be empty";
             log.error(msg);
             return Response.status(400).entity(
@@ -114,7 +113,7 @@ public class ActivityProviderServiceImpl implements ActivityInfoProviderService 
                     activityList.setList(activities);
                     int count = activities.size();
                     if (log.isDebugEnabled()) {
-                        log.debug("Activity count: " + count);
+                        log.debug("Number of activities : " + count);
                     }
                     activityList.setCount(count);
                     return Response.ok().entity(activityList).build();
@@ -220,10 +219,6 @@ public class ActivityProviderServiceImpl implements ActivityInfoProviderService 
         long sinceTimestamp;
         long timestamp = 0;
         boolean isIfModifiedSinceSet = false;
-        if (log.isDebugEnabled()) {
-            log.debug("getActivities since: " + since + " , offset: " + offset + " ,limit: " + limit + " ," +
-                    "ifModifiedSince: " + ifModifiedSince);
-        }
         RequestValidationUtil.validatePaginationParameters(offset, limit);
         if (ifModifiedSince != null && !ifModifiedSince.isEmpty()) {
             Date ifSinceDate;
@@ -251,38 +246,21 @@ public class ActivityProviderServiceImpl implements ActivityInfoProviderService 
             timestamp = sinceTimestamp / 1000;
         }
 
-        if (timestamp == 0) {
-            //If timestamp is not sent by the user, a default value is set, that is equal to current time-12 hours.
-            long time = System.currentTimeMillis() / 1000;
-            timestamp = time - 42300;
-        }
-        if (log.isDebugEnabled()) {
-            log.debug("getActivities final timestamp " + timestamp);
-        }
+        timestamp = validatedTimeStamp(timestamp);
+
         Response response = validateAdminUser();
         if (response == null) {
             List<Activity> activities;
             ActivityList activityList = new ActivityList();
             DeviceManagementProviderService dmService;
             try {
-                if (log.isDebugEnabled()) {
-                    log.debug("Calling database to get activities.");
-                }
                 dmService = DeviceMgtAPIUtils.getDeviceManagementService();
                 activities = dmService.getActivitiesUpdatedAfter(timestamp, limit, offset);
                 activityList.setList(activities);
-                if (log.isDebugEnabled()) {
-                    log.debug("Calling database to get activity count.");
-                }
                 int count = dmService.getActivityCountUpdatedAfter(timestamp);
-                if (log.isDebugEnabled()) {
-                    log.debug("Activity count: " + count);
-                }
                 activityList.setCount(count);
-                if (activities == null || activities.size() == 0) {
-                    if (isIfModifiedSinceSet) {
+                if (activities == null && isIfModifiedSinceSet) {
                         return Response.notModified().build();
-                    }
                 }
                 return Response.ok().entity(activityList).build();
             } catch (OperationManagementException e) {
@@ -297,11 +275,20 @@ public class ActivityProviderServiceImpl implements ActivityInfoProviderService 
         }
     }
 
+    private long validatedTimeStamp(Long timestamp){
+        if (timestamp == 0) {
+            //If timestamp is not sent by the user, a default value is set, that is equal to current time-12 hours.
+            long time = System.currentTimeMillis() / 1000;
+            timestamp = time - 42300;
+        }
+        return timestamp;
+    }
+
     private Response validateAdminUser() {
         try {
             if (!DeviceMgtAPIUtils.isAdmin()) {
                 return Response.status(Response.Status.UNAUTHORIZED).entity(
-                        "Unauthorized operation! Only admin role can perform " + "this operation.").build();
+                        "Unauthorized operation! Only admin role can perform this operation.").build();
             }
             return null;
         } catch (UserStoreException e) {

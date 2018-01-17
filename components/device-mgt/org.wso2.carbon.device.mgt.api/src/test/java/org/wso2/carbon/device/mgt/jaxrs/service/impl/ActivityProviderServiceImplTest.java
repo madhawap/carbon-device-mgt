@@ -13,14 +13,17 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.ObjectFactory;
 import org.testng.annotations.Test;
 import org.wso2.carbon.context.PrivilegedCarbonContext;
+import org.wso2.carbon.device.mgt.common.DeviceIdentifier;
 import org.wso2.carbon.device.mgt.common.authorization.DeviceAccessAuthorizationService;
 import org.wso2.carbon.device.mgt.common.operation.mgt.Activity;
 import org.wso2.carbon.device.mgt.common.operation.mgt.OperationManagementException;
 import org.wso2.carbon.device.mgt.core.authorization.DeviceAccessAuthorizationServiceImpl;
 import org.wso2.carbon.device.mgt.core.service.DeviceManagementProviderService;
 import org.wso2.carbon.device.mgt.core.service.DeviceManagementProviderServiceImpl;
+import org.wso2.carbon.device.mgt.jaxrs.common.ActivityIdList;
 import org.wso2.carbon.device.mgt.jaxrs.service.api.ActivityInfoProviderService;
 import org.wso2.carbon.device.mgt.jaxrs.service.api.DeviceManagementService;
+import org.wso2.carbon.device.mgt.jaxrs.service.impl.util.RequestValidationUtil;
 import org.wso2.carbon.device.mgt.jaxrs.util.DeviceMgtAPIUtils;
 import org.wso2.carbon.policy.mgt.core.util.PolicyManagerUtil;
 
@@ -42,9 +45,17 @@ public class ActivityProviderServiceImplTest {
     private static final Log log = LogFactory.getLog(ActivityProviderServiceImplTest.class);
     private static final String TEST_ACTIVITY_ID = "ACTIVITY_1";
     private static final String IF_MODIFIED_SINCE = "01Aug2018";
+    private static final String DEVICE_TYPE = "android";
+    private static final String DEVICE_ID = "1234567";
+    private static final String OPERATION_CODE = "111222";
+    private static final int OFFSET = 0;
+    private static final int LIMIT = 5;
     private static final String TEST_ACTIVITY_ID_LIST = "ACTIVITY_1,ACTIVITY_2";
     private static final List<String> idList = new ArrayList();
     private static final List<Activity> activities = new ArrayList<>();
+    private static final ActivityIdList activityList = new ActivityIdList();
+    private static final ActivityIdList activityListEmpty = new ActivityIdList();
+
     private List<String> idList1;
     private Activity activity;
     private List<Activity> activities1;
@@ -53,6 +64,7 @@ public class ActivityProviderServiceImplTest {
     private DeviceAccessAuthorizationService deviceAccessAuthorizationService;
     private DeviceManagementProviderService deviceManagementProviderService;
     private ActivityInfoProviderService activityInfoProviderService;
+    private DeviceIdentifier deviceIdentifier;
 
     @ObjectFactory
     public IObjectFactory getObjectFactory() {
@@ -65,6 +77,7 @@ public class ActivityProviderServiceImplTest {
         initMocks(this);
         this.deviceManagementProviderService = Mockito.mock(DeviceManagementProviderServiceImpl.class,
                 Mockito.RETURNS_MOCKS);
+        this.deviceIdentifier = new DeviceIdentifier();
         this.deviceManagementService = new DeviceManagementServiceImpl();
         this.activityInfoProviderService = new ActivityProviderServiceImpl();
         this.deviceAccessAuthorizationService = Mockito.mock(DeviceAccessAuthorizationServiceImpl.class);
@@ -75,8 +88,9 @@ public class ActivityProviderServiceImplTest {
         Activity activity2 = new Activity();
         activity1.setActivityId("ACTIVITY_1");
         activity2.setActivityId("ACTIVITY_2");
-        this.activities.add(activity1);
-        this.activities.add(activity2);
+        activities.add(activity1);
+        activities.add(activity2);
+        activityList.setIds(TEST_ACTIVITY_ID_LIST);
     }
 
     @Test(description =
@@ -140,7 +154,7 @@ public class ActivityProviderServiceImplTest {
                 .toReturn(this.deviceManagementProviderService);
         Mockito.when(this.deviceManagementProviderService.getOperationByActivityIds(idList)).thenReturn(
                 activities);
-        Response response = this.activityInfoProviderService.getActivities(TEST_ACTIVITY_ID_LIST);
+        Response response = this.activityInfoProviderService.getActivities(activityList);
         Assert.assertNotNull(response);
         Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
         Mockito.reset(this.deviceManagementProviderService);
@@ -149,7 +163,7 @@ public class ActivityProviderServiceImplTest {
     @Test(description = "This method tests trying to get details activity IDs when call with empty list")
     public void testGetActivitiesWithEmptyActivityIdList() throws OperationManagementException {
         PowerMockito.stub(PowerMockito.method(DeviceMgtAPIUtils.class, "isAdmin")).toReturn(true);
-        Response response = this.activityInfoProviderService.getActivities("");
+        Response response = this.activityInfoProviderService.getActivities(activityListEmpty);
         Assert.assertNotNull(response);
         Assert.assertEquals(response.getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
         Mockito.reset(this.deviceManagementProviderService);
@@ -162,9 +176,50 @@ public class ActivityProviderServiceImplTest {
                 .toReturn(this.deviceManagementProviderService);
         Mockito.when(this.deviceManagementProviderService.getOperationByActivityIds(idList1)).thenReturn(
                 activities1);
-        Response response = this.activityInfoProviderService.getActivities(TEST_ACTIVITY_ID_LIST);
+        Response response = this.activityInfoProviderService.getActivities(activityList);
         Assert.assertNotNull(response);
         Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+        Mockito.reset(this.deviceManagementProviderService);
+    }
+
+    @Test(description = "This method tests  getting details of an activity for a given device")
+    public void testGetActivitiesByDevice()
+            throws OperationManagementException {
+        PowerMockito.stub(PowerMockito.method(DeviceMgtAPIUtils.class, "getDeviceManagementService"))
+                .toReturn(this.deviceManagementProviderService);
+        Mockito.when(this.deviceManagementProviderService.getOperationByActivityIdAndDevice(TEST_ACTIVITY_ID,deviceIdentifier))
+                .thenReturn(activity);
+        Response response = this.activityInfoProviderService.getActivityByDevice(TEST_ACTIVITY_ID,DEVICE_TYPE,DEVICE_ID,IF_MODIFIED_SINCE);
+        Assert.assertNotNull(response);
+        Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+        Mockito.reset(this.deviceManagementProviderService);
+    }
+    @Test(description = "This method tests getting details of an activity for a given device")
+    public void testGetActivities()
+            throws OperationManagementException {
+        PowerMockito.stub(PowerMockito.method(DeviceMgtAPIUtils.class, "isAdmin")).toReturn(true);
+        PowerMockito.stub(PowerMockito.method(DeviceMgtAPIUtils.class, "getDeviceManagementService"))
+                .toReturn(this.deviceManagementProviderService);
+        Mockito.when(this.deviceManagementProviderService.getFilteredActivities(OPERATION_CODE, OFFSET, LIMIT))
+                .thenReturn(activities);
+        Response response = this.activityInfoProviderService.getActivities(OPERATION_CODE, OFFSET, LIMIT);
+        Assert.assertNotNull(response);
+        Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+        Mockito.reset(this.deviceManagementProviderService);
+    }
+
+    @Test(description = "This method tests getting details of an activity for a given device")
+    public void testGetActivitiesForInvalidUser()
+            throws OperationManagementException {
+        PowerMockito.stub(PowerMockito.method(DeviceMgtAPIUtils.class, "isAdmin")).toReturn(false);
+        PowerMockito.stub(PowerMockito.method(RequestValidationUtil.class, "validateActivityId"));
+        PowerMockito.stub(PowerMockito.method(DeviceMgtAPIUtils.class, "getDeviceManagementService"))
+                .toReturn(this.deviceManagementProviderService);
+        Mockito.when(this.deviceManagementProviderService.getFilteredActivities(OPERATION_CODE, OFFSET, LIMIT))
+                .thenReturn(activities);
+        Response response = this.activityInfoProviderService.getActivities(OPERATION_CODE, OFFSET, LIMIT);
+        Assert.assertNotNull(response);
+        Assert.assertEquals(response.getStatus(), Response.Status.UNAUTHORIZED.getStatusCode());
         Mockito.reset(this.deviceManagementProviderService);
     }
 
