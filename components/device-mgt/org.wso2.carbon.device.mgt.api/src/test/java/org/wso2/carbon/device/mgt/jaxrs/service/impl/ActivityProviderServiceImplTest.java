@@ -182,24 +182,25 @@ public class ActivityProviderServiceImplTest {
     }
 
     @Test(description = "This method tests  getting details of an activity for a given device")
-    public void testGetActivitiesByDevice()
-            throws OperationManagementException {
+    public void testGetActivitiesByDevice() throws OperationManagementException {
         PowerMockito.stub(PowerMockito.method(DeviceMgtAPIUtils.class, "getDeviceManagementService"))
                 .toReturn(this.deviceManagementProviderService);
-        Mockito.when(this.deviceManagementProviderService.getOperationByActivityIdAndDevice(TEST_ACTIVITY_ID,deviceIdentifier))
-                .thenReturn(activity);
-        Response response = this.activityInfoProviderService.getActivityByDevice(TEST_ACTIVITY_ID,DEVICE_TYPE,DEVICE_ID,IF_MODIFIED_SINCE);
+        Mockito.when(this.deviceManagementProviderService
+                .getOperationByActivityIdAndDevice(TEST_ACTIVITY_ID, deviceIdentifier)).thenReturn(activity);
+        Response response = this.activityInfoProviderService.getActivityByDevice(TEST_ACTIVITY_ID,
+                DEVICE_TYPE, DEVICE_ID, IF_MODIFIED_SINCE);
         Assert.assertNotNull(response);
         Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
         Mockito.reset(this.deviceManagementProviderService);
     }
+
     @Test(description = "This method tests getting details of an activity for a given device")
-    public void testGetActivities()
-            throws OperationManagementException {
+    public void testGetActivities() throws OperationManagementException {
         PowerMockito.stub(PowerMockito.method(DeviceMgtAPIUtils.class, "isAdmin")).toReturn(true);
         PowerMockito.stub(PowerMockito.method(DeviceMgtAPIUtils.class, "getDeviceManagementService"))
                 .toReturn(this.deviceManagementProviderService);
-        Mockito.when(this.deviceManagementProviderService.getFilteredActivities(OPERATION_CODE, OFFSET, LIMIT))
+        Mockito.when(
+                this.deviceManagementProviderService.getFilteredActivities(OPERATION_CODE, OFFSET, LIMIT))
                 .thenReturn(activities);
         Response response = this.activityInfoProviderService.getActivities(OPERATION_CODE, OFFSET, LIMIT);
         Assert.assertNotNull(response);
@@ -208,13 +209,13 @@ public class ActivityProviderServiceImplTest {
     }
 
     @Test(description = "This method tests getting details of an activity for a given device")
-    public void testGetActivitiesForInvalidUser()
-            throws OperationManagementException {
+    public void testGetActivitiesForInvalidUser() throws OperationManagementException {
         PowerMockito.stub(PowerMockito.method(DeviceMgtAPIUtils.class, "isAdmin")).toReturn(false);
         PowerMockito.stub(PowerMockito.method(RequestValidationUtil.class, "validateActivityId"));
         PowerMockito.stub(PowerMockito.method(DeviceMgtAPIUtils.class, "getDeviceManagementService"))
                 .toReturn(this.deviceManagementProviderService);
-        Mockito.when(this.deviceManagementProviderService.getFilteredActivities(OPERATION_CODE, OFFSET, LIMIT))
+        Mockito.when(
+                this.deviceManagementProviderService.getFilteredActivities(OPERATION_CODE, OFFSET, LIMIT))
                 .thenReturn(activities);
         Response response = this.activityInfoProviderService.getActivities(OPERATION_CODE, OFFSET, LIMIT);
         Assert.assertNotNull(response);
